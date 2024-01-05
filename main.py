@@ -53,16 +53,21 @@ class Gene:
 
 
 class GeneticAlgorithm:
-    def __init__(self, clauses, weights, population_size=100, mutation_rate=0.01, generations=100, verbose=True):
+    def __init__(self, clauses, weights, population_size=100, initial_mutation_rate=0.01, mutation_scaler=1.,
+                 generations=100, verbose=True):
         self.clauses = clauses
         self.weights = weights
         self.population_size = population_size
-        self.mutation_rate = mutation_rate
+        self.mutation_rate = initial_mutation_rate
+        self.mutation_scaler = mutation_scaler
         self.generations = generations
         self.population = [Gene(len(weights), clauses, weights) for _ in range(population_size)]
         self.best_valid = None
         self.fitness_log = []
         self.verbose = verbose
+
+    def adjust_rates(self):
+        self.mutation_rate *= self.mutation_scaler
 
     def select_parent(self):
         total_fitness = sum(gene.fitness for gene in self.population)
@@ -86,6 +91,7 @@ class GeneticAlgorithm:
 
     def run(self):
         for generation in range(self.generations):
+            self.adjust_rates()
             new_population = []
             for _ in range(self.population_size // 2):
                 parent1 = self.select_parent()
@@ -103,7 +109,7 @@ class GeneticAlgorithm:
             if len(valid_genes) != 0:
                 self.best_valid = max(valid_genes, key=lambda gene: gene.fitness)
             if self.verbose:
-                print(f"{generation}: {str(best_gene)}")
+                print(f"{generation}: {str(best_gene)}, Mutation: {self.mutation_rate}")
 
         return max(self.population, key=lambda gene: gene.fitness)
 
@@ -117,7 +123,8 @@ if __name__ == "__main__":
     print(best)
     print(evaluate(c, w, best))
 
-    ga = GeneticAlgorithm(c, w, population_size=1000, mutation_rate=0.15, generations=100, verbose=True)
+    ga = GeneticAlgorithm(c, w, population_size=100, initial_mutation_rate=0.3, mutation_scaler=0.98, generations=100,
+                          verbose=True)
     ga.run()
     print(ga.best_valid)
     print(f"Weights: {ga.best_valid.weights_sum}")
