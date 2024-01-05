@@ -51,10 +51,13 @@ class Gene:
     def __str__(self):
         return f"Best = {round(self.fitness, 2)}, NF: {self.not_fulfilled_cnt}, W: {self.weights_sum}, ({self.evaluation})"
 
+    def __repr__(self):
+        return f"Gene({round(self.fitness, 2)})"
+
 
 class GeneticAlgorithm:
     def __init__(self, clauses, weights, population_size=100, initial_mutation_rate=0.01, mutation_scaler=1.,
-                 generations=100, verbose=True):
+                 generations=100, verbose=True, elites=0.):
         self.clauses = clauses
         self.weights = weights
         self.population_size = population_size
@@ -65,6 +68,7 @@ class GeneticAlgorithm:
         self.best_valid = None
         self.fitness_log = []
         self.verbose = verbose
+        self.elites_cnt = int(population_size * elites)
 
     def adjust_rates(self):
         self.mutation_rate *= self.mutation_scaler
@@ -93,7 +97,11 @@ class GeneticAlgorithm:
         for generation in range(self.generations):
             self.adjust_rates()
             new_population = []
-            for _ in range(self.population_size // 2):
+            if self.elites_cnt > 0:
+                elites = sorted(self.population, key=lambda gene: gene.fitness, reverse=True)[:self.elites_cnt]
+                new_population = elites
+
+            while len(new_population) < self.population_size:
                 parent1 = self.select_parent()
                 parent2 = self.select_parent()
                 child1 = self.crossover(parent1, parent2)
@@ -124,7 +132,7 @@ if __name__ == "__main__":
     print(evaluate(c, w, best))
 
     ga = GeneticAlgorithm(c, w, population_size=100, initial_mutation_rate=0.3, mutation_scaler=0.98, generations=100,
-                          verbose=True)
+                          elites=0., verbose=False)
     ga.run()
     print(ga.best_valid)
     print(f"Weights: {ga.best_valid.weights_sum}")
