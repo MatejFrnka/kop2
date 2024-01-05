@@ -2,17 +2,7 @@ import random
 
 import matplotlib.pyplot as plt
 
-
-def parse_input(input_str):
-    lines = input_str.split('\n')
-    weights = []
-    clauses = []
-    for line in lines:
-        if line.startswith('w'):
-            weights = [int(x) for x in line.split()[1:-1]]
-        elif not line.startswith('c') and not line.startswith('p') and line.strip():
-            clauses.append([int(x) for x in line.split()[:-1]])
-    return clauses, weights
+from utility import parse_input
 
 
 def evaluate(clauses, weights, evaluation):
@@ -32,6 +22,8 @@ def evaluate(clauses, weights, evaluation):
 def fitness(not_fulfilled_cnt, weight_sum, gene_len: int):
     fulfilled_cnt = gene_len - not_fulfilled_cnt
     return ((fulfilled_cnt + 1) / (not_fulfilled_cnt + 1)) * weight_sum
+    # return weight_sum/ (not_fulfilled_cnt + 1)
+    # return fulfilled_cnt + weight_sum
 
 
 class Gene:
@@ -56,19 +48,21 @@ class Gene:
 
 
 class GeneticAlgorithm:
-    def __init__(self, clauses, weights, population_size=100, initial_mutation_rate=0.01, mutation_scaler=1.,
+    def __init__(self, population_size=100, initial_mutation_rate=0.01, mutation_scaler=1.,
                  generations=100, verbose=True, elites=0.):
-        self.clauses = clauses
-        self.weights = weights
         self.population_size = population_size
-        self.mutation_rate = initial_mutation_rate
+        self.initial_mutation_rate = initial_mutation_rate
         self.mutation_scaler = mutation_scaler
         self.generations = generations
-        self.population = [Gene(len(weights), clauses, weights) for _ in range(population_size)]
-        self.best_valid = None
-        self.fitness_log = []
         self.verbose = verbose
         self.elites_cnt = int(population_size * elites)
+
+        self.mutation_rate = initial_mutation_rate
+        self.fitness_log = []
+        self.clauses = None
+        self.weights = None
+        self.best_valid = None
+        self.population = None
 
     def adjust_rates(self):
         self.mutation_rate *= self.mutation_scaler
@@ -93,7 +87,14 @@ class GeneticAlgorithm:
             if random.random() < self.mutation_rate:
                 gene.mutate()
 
-    def run(self):
+    def run(self, clauses, weights):
+        self.mutation_rate = self.initial_mutation_rate
+        self.fitness_log = []
+        self.clauses = clauses
+        self.weights = weights
+        self.best_valid = None
+        self.population = [Gene(len(weights), clauses, weights) for _ in range(self.population_size)]
+
         for generation in range(self.generations):
             self.adjust_rates()
             new_population = []
@@ -119,23 +120,4 @@ class GeneticAlgorithm:
             if self.verbose:
                 print(f"{generation}: {str(best_gene)}, Mutation: {self.mutation_rate}")
 
-        return max(self.population, key=lambda gene: gene.fitness)
-
-
-if __name__ == "__main__":
-    path = 'wuf20-91/wuf20-91-M/wuf20-01.mwcnf'
-    input_str = open(path, 'r').read()
-    c, w = parse_input(input_str)
-    best = [0 if int(f) < 0 else 1 for f in
-            "1 -2 -3 4 -5 6 -7 -8 -9 10 -11 -12 13 14 15 -16 17 -18 -19 20".split(" ")]
-    print(best)
-    print(evaluate(c, w, best))
-
-    ga = GeneticAlgorithm(c, w, population_size=100, initial_mutation_rate=0.3, mutation_scaler=0.98, generations=100,
-                          elites=0., verbose=False)
-    ga.run()
-    print(ga.best_valid)
-    print(f"Weights: {ga.best_valid.weights_sum}")
-
-    plt.plot(ga.fitness_log)
-    plt.show()
+        return self.best_valid
