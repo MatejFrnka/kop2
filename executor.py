@@ -2,16 +2,20 @@ import os
 from pathlib import Path
 import random
 
+import pandas as pd
 from matplotlib import pyplot as plt
 
-from main import GeneticAlgorithm
+from main import GeneticAlgorithm, Gene
 from utility import parse_input
 
 
 class Executor:
-    def __init__(self, dataset_name, dataset_type):
+    def __init__(self, dataset_name, dataset_type, verbose=True, plots=False):
         self.dataset_name = dataset_name
         self.dataset_type = dataset_type
+        self.data = pd.DataFrame()
+        self.plots = plots
+        self.verbose = verbose
 
     def instances_folder_path(self):
         return Path(self.dataset_name) / f"{self.dataset_name}-{self.dataset_type}"
@@ -25,31 +29,51 @@ class Executor:
             for line in file:
                 data = line.split()
                 if data[0] == instance_name:
-                    return int(data[1])
+                    return int(data[1]), [int(int(x) > 0) for x in data[2:-1]]
         # If the instance name is not found, return None
         return None
 
-    def execute(self, genetic_algorithm: GeneticAlgorithm, repeat = 1):
+    def execute(self, genetic_algorithm: GeneticAlgorithm, repeat=1, limit=None):
         files = os.listdir(self.instances_folder_path())
-        file = random.choice(files)
-        input_str = open(Path(self.instances_folder_path()) / file, 'r').read()
+        for i, file in enumerate(files):
+            if limit < i:
+                break
+            self.execute_file(file, genetic_algorithm, repeat)
+
+    def execute_file(self, file, genetic_algorithm: GeneticAlgorithm, repeat=1):
+        file_path = Path(self.instances_folder_path()) / file
+        input_str = open(file_path, 'r').read()
         c, w = parse_input(input_str)
-        print(f"Best: {self.solution(file)}")
         for i in range(repeat):
-            found_gene = genetic_algorithm.run(c, w)
-            found = None if found_gene is None else found_gene.weights_sum
-            print(f"{file}: Found: {found}, Best: {self.solution(file)}")
-            plt.plot(ga.fitness_log)
-            plt.title(f"{i}, {file}: Found: {found}, Best: {self.solution(file)}")
-            plt.show()
+            found_gene: Gene = genetic_algorithm.run(c, w)
+
+            log_df = pd.DataFrame(ga.log)
+            log_df['it'] = i
+            log_df['category'] = self.dataset_type
+            log_df['dataset_name'] = self.dataset_name
+            log_df['dataset_file'] = file
+
+            for cnf in ga.get_config().keys():
+                log_df[f"config_{cnf}"] = ga.get_config()[cnf]
+
+            self.data = pd.concat([self.data, log_df], ignore_index=True)
+
+            found = None if found_gene is None else found_gene.get_weights_sum()
+            if self.verbose:
+                print(f"{file}: Found: {found}, Best: {self.solution(file)}")
+            if self.plots:
+                plt.plot([p['best_gene_fitness'] for p in ga.log])
+                plt.title(f"{i}, {file}: Found: {found}, Best: {self.solution(file)}")
+                plt.show()
 
 
 if __name__ == "__main__":
-    random.seed(5)
-    e = Executor('wuf20-91', 'Q')
-    ga = GeneticAlgorithm(population_size=800, initial_mutation_rate=0.4, mutation_scaler=0.99, generations=100,
-                          elites=0.1, verbose=True)
-    e.execute(ga, 10)
+    # random.seed(4)
+    e = Executor('wuf20-91', 'M', verbose=True)
+    ga = GeneticAlgorithm(population_size=800, initial_mutation_rate=0.4, mutation_scaler=0.97, generations=5,
+                          elites=0.01, verbose=False)
+    e.execute(ga, 1, limit=5)
+    e.data.to_csv("wuf20-91_test.csv")
     # path = 'wu/f20-91/wuf20-91-M/wuf20-01.mwcnf'
     # input_str = open(path, 'r').read()
     # c, w = parse_input(input_str)
@@ -63,4 +87,3 @@ if __name__ == "__main__":
     # print(ga.best_valid)
     # print(f"Weights: {ga.best_valid.weights_sum}")
     #
-
