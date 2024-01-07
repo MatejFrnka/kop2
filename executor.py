@@ -13,18 +13,18 @@ from tqdm import tqdm
 
 
 class Executor:
-    def __init__(self, dataset_name, dataset_type, verbose=True, plots=False):
+    def __init__(self, dataset_name, category, verbose=True, plots=False):
         self.dataset_name = dataset_name
-        self.dataset_type = dataset_type
+        self.category = category
         self.data = pd.DataFrame()
         self.plots = plots
         self.verbose = verbose
 
     def instances_folder_path(self):
-        return Path(self.dataset_name) / f"{self.dataset_name}-{self.dataset_type}"
+        return Path(self.dataset_name) / f"{self.dataset_name}-{self.category}"
 
     def results_file_path(self):
-        return Path(self.dataset_name) / f"{self.dataset_name}-{self.dataset_type}-opt.dat"
+        return Path(self.dataset_name) / f"{self.dataset_name}-{self.category}-opt.dat"
 
     def solution(self, instance_file):
         instance_name = instance_file[1:-6]
@@ -54,7 +54,7 @@ class Executor:
 
             log_df = pd.DataFrame(genetic_algorithm.log)
             log_df['it'] = i
-            log_df['category'] = self.dataset_type
+            log_df['category'] = self.category
             log_df['dataset_name'] = self.dataset_name
             log_df['dataset_file'] = file
             log_df['time'] = toc
@@ -76,32 +76,62 @@ class Executor:
 
 def measure():
     # random.seed(4)
-    datasets = ['wuf20-91']
-    problems = ['M', 'N', 'Q', 'R']
+    datasets = ['wuf20-91', 'wuf50-218']
+    categories = ['M', 'N', 'Q', 'R']
     algos = [
-        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.15, mutation_scaler=1, generations=60,
-                         elites=0, verbose=False)
+        # ================= POPULATION SPEED IMPACT
+        GeneticAlgorithm(population_size=100, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0, verbose=False),
+        GeneticAlgorithm(population_size=200, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0, verbose=False),
+        GeneticAlgorithm(population_size=300, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0, verbose=False),
+        GeneticAlgorithm(population_size=400, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0, verbose=False),
+        # === mutation and population speed impact
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0, verbose=False),
+        # ================= MUTATION
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.3, mutation_scaler=1, generations=80,
+                         elites=0, verbose=False),
+        # ================= MUTATION SCALER
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.3, mutation_scaler=.97, generations=80,
+                         elites=0, verbose=False),
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.5, mutation_scaler=.97, generations=80,
+                         elites=0, verbose=False),
+        # ================= ELITES
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0.01, verbose=False),
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.15, mutation_scaler=1, generations=80,
+                         elites=0.1, verbose=False),
+        # ================= COMBINATION
+        GeneticAlgorithm(population_size=500, initial_mutation_rate=0.3, mutation_scaler=.97, generations=80,
+                         elites=0.01, verbose=False),
+
+        # ====== HARDCORE MEASUREMENTS
+        GeneticAlgorithm(population_size=1000, initial_mutation_rate=0.3, mutation_scaler=.97, generations=100,
+                         elites=0.05, verbose=False),
     ]
 
     df_all = pd.DataFrame()
 
     repeat = 6
     limit = 5
-    with tqdm(total=len(datasets) * len(problems) * len(algos), desc='Overall Progress') as progress_bar:
+    with tqdm(total=len(datasets) * len(categories) * len(algos), desc='Overall Progress') as progress_bar:
         for dataset in datasets:
-            for problem in problems:
+            for category in categories:
                 for ga in algos:
-                    e = Executor('wuf20-91', 'M', verbose=False)
+                    e = Executor('wuf20-91', category, verbose=False)
                     e.execute(ga, repeat, limit)
-                    e.data.to_csv(f"{dataset}_{problem}_{time.time()}.csv")
+                    e.data.to_csv(f"checkpoint/{dataset}_{category}_{int(time.time() % 1_000_000)}.csv")
                     df_all = pd.concat([df_all, e.data], ignore_index=True)
                     progress_bar.update(1)
-    df_all.to_csv(f"{dataset}_{time.time()}.csv")
+    df_all.to_csv(f"{dataset}_{int(time.time() % 1_000_000)}.csv")
 
 
 if __name__ == "__main__":
     measure()
-    # e = Executor('wuf20-91', 'M', verbose=True)
-    # ga = GeneticAlgorithm(population_size=800, initial_mutation_rate=0.1, mutation_scaler=1, generations=80,
-    #                       elites=0.01, verbose=True)
+    # e = Executor('wuf20-91', 'N', verbose=True)
+    # ga = GeneticAlgorithm(population_size=500, initial_mutation_rate=0.3, mutation_scaler=.97, generations=80,
+    #                       elites=0, verbose=True)
     # e.execute(ga, 1, limit=1)

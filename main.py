@@ -1,9 +1,14 @@
 import random
+from cachetools import cached, LRUCache
 from typing import List
 
 import numpy as np
+from cachetools.keys import hashkey
+
+cache = LRUCache(maxsize=3_000)
 
 
+@cached(cache=cache, key=lambda clauses, weights, evaluation: hashkey(tuple(evaluation)))
 def evaluate(clauses, weights, evaluation):
     not_fulfilled_cnt = sum(
         1 for clause in clauses
@@ -116,6 +121,7 @@ class GeneticAlgorithm:
         self.weights = weights
         self.best_valid = None
         self.population: List[Gene] = [Gene(len(weights), clauses, weights) for _ in range(self.population_size)]
+        cache.clear()
 
         for generation in range(self.generations):
             self.adjust_rates()
@@ -138,17 +144,21 @@ class GeneticAlgorithm:
             genes_fitness = [(self.fitness(gene, generation), gene) for gene in self.population]
             best_gene_fitness, best_gene = max(genes_fitness, key=lambda d: d[0])
             valid_genes = [x for x in self.population if x.get_not_fulfilled_cnt() == 0]
+            best_valid_gene = None if len(valid_genes) == 0 else max(valid_genes, key=lambda d: d.get_weights_sum())
             self.log.append(
                 {
                     'best_gene_fitness': best_gene_fitness,
                     'best_gene_not_fulfilled': best_gene.get_not_fulfilled_cnt(),
                     'best_gene_weight': best_gene.get_weights_sum(),
+                    'best_valid_fitness': None if best_valid_gene is None else self.fitness(best_valid_gene,
+                                                                                            generation),
+                    'best_valid_weight': None if best_valid_gene is None else best_valid_gene.get_weights_sum(),
+                    'valid_count': len(valid_genes),
                     'avg_fitness': np.mean([k[0] for k in genes_fitness]),
                     'median_fitness': np.median([k[0] for k in genes_fitness]),
                     'std_fitness': np.std([k[0] for k in genes_fitness]),
                     'avg_not_fulfilled': np.mean([w.get_not_fulfilled_cnt() for w in self.population]),
                     'avg_weight': np.mean([w.get_weights_sum() for w in self.population]),
-                    'valid_count': len(valid_genes),
                     'generation': generation
                 })
             if len(valid_genes) != 0:
